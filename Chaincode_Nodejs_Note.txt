@@ -1,0 +1,175 @@
+Reference:
+
+Setting up RESTful API Server for Hyperledger Fabric With NodeJS SDK
+	https://www.skcript.com/svr/setting-up-restful-api-server-for-hyperledger-fabric-with-nodejs-sdk/
+
+Reference sample:
+	(v1.4)
+		https://github.com/IBM/global-financing-blockchain
+	(v1.3)
+		https://github.com/IBM/car-auction-network-fabric-node-sdk
+
+Unit test:
+	https://github.com/wearetheledger/fabric-mock-stub
+
+Chaincode interface (v1.3)
+	https://fabric-shim.github.io/master/tutorial-using-chaincodeinterface.html
+
+Smart Contract interface (v1.4)
+	https://fabric-shim.github.io/master/tutorial-using-contractinterface.html
+
+
+=============================================================================================================
+Chaincode
+
+Create a car auction network with Hyperledger Fabric Node.js SDK and IBM Blockchain Starter Plan
+https://github.com/IBM/car-auction-network-fabric-node-sdk
+
+Skeleton:
+'use strict';
+const shim = require('fabric-shim');
+let Chaincode = class {
+	
+	async Init(stub) {
+		...
+	}
+
+	async Invoke(stub) {
+		...
+	}
+
+}
+shim.start(new Chaincode()); 
+
+
+Detail:
+stub.getFunctionAndParameters();
+
+
+Put state
+await stub.putState('memberA@acme.org', Buffer.from(JSON.stringify(member1)));
+	JSON.stringify: Converts a JavaScript value to a JavaScript Object Notation (JSON) string.
+
+Get state
+let queryAsBytes = await stub.getState(query); //get the car from chaincode state
+    if (!queryAsBytes || queryAsBytes.toString().length <= 0) {
+      throw new Error('key' + ' does not exist: ');
+    }
+queryAsBytes.toString(): convert bytes to string
+
+Converts a JavaScript Object Notation (JSON) string into an object.
+listing = JSON.parse(listingAsBytes);
+listingAsBytes is implicitly converted to string
+
+// TODO: util.inspect
+console.info(util.inspect(vehicle, { showHidden: false, depth: null }));
+
+// TODO: compare with go
+	combosite: https://fabric-shim.github.io/release-1.3/fabric-shim.ChaincodeStub.html#createCompositeKey__anchor
+In general, they are the same
+
+
+=============================================================================================================
+SDK - Client
+
+	Query
+		.\query.js
+
+	Invoke
+		.\invoke.js
+
+	Refer more from go (insurance)
+
+
+=============================================================================================================
+Testing chaincode
+
+import { MyChaincode } from '../<path_to_your_chaincode_class>';
+import { ChaincodeMockStub, Transform } from "@theledger/fabric-mock-stub";
+
+// You always need your chaincode so it knows which chaincode to invoke on
+const chaincode = new MyChaincode();
+
+describe('Test MyChaincode', () => {
+
+		// INIT
+
+    it("Should init without issues", async () => {
+        const mockStub = new ChaincodeMockStub("MyMockStub", chaincode);
+
+        const response = await mockStub.mockInit("tx1", []);
+
+        expect(response.status).to.eql(200)
+    });
+
+    // QUERY
+
+    it("Should query car", async () => {
+        const mockStub = new ChaincodeMockStub("MyMockStub", chaincode);
+
+        const response = await mockStub.mockInvoke("tx2", ['queryCar', `CAR0`]);
+
+        expect(Transform.bufferToObject(response.payload)).to.deep.eq({
+            'make': 'prop1',
+            'model': 'prop2',
+            'color': 'prop3',
+            'owner': 'owner',
+            'docType': 'car'
+        });
+    });
+
+    // INVOKE
+
+    it("Should be able to add car", async () => {
+        const mockStub = new ChaincodeMockStub("MyMockStub", chaincode);
+
+        const response = await mockStub.mockInvoke("tx1", ['createCar', `CAR0`, `prop1`, `prop2`, `prop3`, `owner`]);
+
+        expect(response.status).to.eql(200)
+
+        const response = await mockStub.mockInvoke("tx1", ['queryCar', `CAR0`]);
+
+        expect(Transform.bufferToObject(response.payload)).to.deep.eq({
+            'make': 'prop1',
+            'model': 'prop2',
+            'color': 'prop3',
+            'owner': 'owner',
+            'docType': 'car'
+        })
+    });
+
+    // INDIVIDUAL METHOD
+
+    it("Should be able to add car", async () => {
+        const stub = new ChaincodeMockStub("MyMockStub", chaincode);
+
+        const car0 = {
+            'make': 'Toyota',
+            'model': 'Prius',
+            'color': 'blue',
+            'owner': 'Tomoko',
+            'docType': 'car'
+        };
+
+        const car = await chaincode.queryCar(stub, ["CAR0"])
+
+        expect(car).to.deep.equal(car0);
+    });
+
+    // EVENT
+
+    it("Should get the emitted event", async () => {
+        const mockStub = new ChaincodeMockStub("MyMockStub", chaincode);
+
+        await mockStub.mockInvoke("tx1", ['createCar', `CAR0`, `prop1`, `prop2`, `prop3`, `owner`]);
+
+        const eventPayload = await mockStub.getEvent('CREATE_CAR');
+
+        expect(eventPayload).to.equal('Car created.');
+		});
+
+});
+
+Links:
+	API: 				https://wearetheledger.github.io/fabric-mock-stub/classes/_chaincodemockstub_.chaincodemockstub.html
+	Example: 		https://github.com/wearetheledger/fabric-mock-stub/tree/master/examples/tests
